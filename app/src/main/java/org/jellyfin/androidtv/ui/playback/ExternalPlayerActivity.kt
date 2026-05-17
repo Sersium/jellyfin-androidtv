@@ -156,12 +156,18 @@ class ExternalPlayerActivity : FragmentActivity() {
 		val subtitleUrlsToUris = subtitleUrls.map { it.toUri() }.toTypedArray()
 		val subtitleNames = externalSubtitles.map { it.displayTitle ?: it.title.orEmpty() }.toTypedArray()
 		val subtitleFileNames = externalSubtitles.map { it.path?.let { path -> File(path).name }.orEmpty() }.toTypedArray()
-		val vimuSrtSubtitle = subtitleData.firstOrNull { (_, format, _) ->
-			format.equals("srt", ignoreCase = true)
+		var vimuFallbackSrtSubtitle: Triple<MediaStream, String, String>? = null
+		var vimuPreferredSrtSubtitle: Triple<MediaStream, String, String>? = null
+		for (subtitle in subtitleData) {
+			val (stream, format, _) = subtitle
+			if (!format.equals("srt", ignoreCase = true)) continue
+			if (vimuFallbackSrtSubtitle == null) vimuFallbackSrtSubtitle = subtitle
+			if (subtitleMatchesVideoName(stream.path, videoBaseName)) {
+				vimuPreferredSrtSubtitle = subtitle
+				break
+			}
 		}
-		val vimuPreferredSrtSubtitle = subtitleData.firstOrNull { (stream, format, _) ->
-			format.equals("srt", ignoreCase = true) && subtitleMatchesVideoName(stream.path, videoBaseName)
-		} ?: vimuSrtSubtitle
+		val vimuSubtitle = vimuPreferredSrtSubtitle ?: vimuFallbackSrtSubtitle
 
 		Timber.i(
 			"Starting item ${item.id} from $position with ${subtitleUrls.size} external subtitles: $url${
@@ -199,7 +205,7 @@ class ExternalPlayerActivity : FragmentActivity() {
 			putExtra(API_VIMU_SEEK_POSITION, position.inWholeMilliseconds.toInt())
 			putExtra(API_VIMU_RESUME, false)
 			putExtra(API_VIMU_TITLE, title)
-			vimuPreferredSrtSubtitle?.let { (_, _, subtitleUrl) ->
+			vimuSubtitle?.let { (_, _, subtitleUrl) ->
 				putExtra(API_VIMU_FORCED_SRT, subtitleUrl.toUri())
 			}
 		}
