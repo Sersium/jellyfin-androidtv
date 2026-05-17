@@ -46,7 +46,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           release_title="Latest Build"
-          release_notes="Automated debug APKs for commit $GITHUB_SHA."
+          release_notes="Automated APKs for commit $GITHUB_SHA."
           shopt -s nullglob
           apks=(build/gh-app-publish/*.apk)
           if [ ${#apks[@]} -eq 0 ]; then
@@ -57,7 +57,7 @@ jobs:
             gh release delete latest-build --cleanup-tag --yes
           else
             # Clean up orphaned latest-build tag if it exists without a release.
-            echo "Release does not exist yet; checking for orphaned latest-build tag."
+            echo "Release does not exist; checking for orphaned latest-build tag."
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/latest-build" >/dev/null 2>&1 || true
           fi
           gh release create latest-build \
