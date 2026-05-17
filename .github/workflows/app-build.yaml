@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -40,13 +40,25 @@ jobs:
           retention-days: 14
           if-no-files-found: error
           path: build/gh-app-publish/
+  publish-latest:
+    name: Publish latest APKs for guest download
+    runs-on: ubuntu-24.04
+    needs: build
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: build-artifacts
+          path: build/gh-app-publish/
       - name: Publish latest APKs for guest download
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           release_title="Latest Build"
-          release_notes="Automated APKs for commit $GITHUB_SHA."
+          release_notes="Automated APKs for commit ${GITHUB_SHA:0:7}."
           shopt -s nullglob
           apks=(build/gh-app-publish/*.apk)
           if [ ${#apks[@]} -eq 0 ]; then
@@ -54,15 +66,16 @@ jobs:
             exit 1
           fi
           if gh release view latest-build >/dev/null 2>&1; then
-            gh release delete latest-build --cleanup-tag --yes
+            gh release edit latest-build \
+              --target "$GITHUB_SHA" \
+              --title "$release_title" \
+              --notes "$release_notes" \
+              --prerelease
           else
-            # Clean up orphaned latest-build tag if it exists without a release.
-            echo "Release does not exist; checking for orphaned latest-build tag."
-            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/latest-build" >/dev/null 2>&1 || true
+            gh release create latest-build \
+              --target "$GITHUB_SHA" \
+              --title "$release_title" \
+              --notes "$release_notes" \
+              --prerelease
           fi
-          gh release create latest-build \
-            --target "$GITHUB_SHA" \
-            --title "$release_title" \
-            --notes "$release_notes" \
-            --prerelease \
-            "${apks[@]}"
+          gh release upload latest-build "${apks[@]}" --clobber
