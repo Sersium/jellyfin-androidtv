@@ -43,6 +43,12 @@ jobs:
         run: |
           release_title="Latest Build"
           release_notes="Automated debug APKs for commit $GITHUB_SHA."
+          shopt -s nullglob
+          apks=(build/gh-app-publish/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No APK files found in build/gh-app-publish/"
+            exit 1
+          fi
           if gh release view latest-build >/dev/null 2>&1; then
             gh release edit latest-build \
               --target "$GITHUB_SHA" \
@@ -55,11 +61,5 @@ jobs:
               --title "$release_title" \
               --notes "$release_notes" \
               --prerelease
-          fi
-          shopt -s nullglob
-          apks=(build/gh-app-publish/*.apk)
-          if [ ${#apks[@]} -eq 0 ]; then
-            echo "No APK files found in build/gh-app-publish/"
-            exit 1
           fi
           gh release upload latest-build "${apks[@]}" --clobber
