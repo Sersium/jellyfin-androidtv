@@ -65,17 +65,19 @@ jobs:
             echo "No APK files found in build/gh-app-publish/"
             exit 1
           fi
-          if gh release view latest-build >/dev/null 2>&1; then
+          if gh release view latest-build --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit latest-build \
+              --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "$release_title" \
               --notes "$release_notes" \
               --prerelease
           else
             gh release create latest-build \
+              --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "$release_title" \
               --notes "$release_notes" \
               --prerelease
           fi
-          gh release upload latest-build "${apks[@]}" --clobber
+          gh release upload latest-build "${apks[@]}" --repo "$GITHUB_REPOSITORY" --clobber
