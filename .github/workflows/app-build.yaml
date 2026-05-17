@@ -41,10 +41,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete latest-build --cleanup-tag --yes || true
-          gh release create latest-build \
-            --target "$GITHUB_SHA" \
-            --title "Latest Build" \
-            --notes "Automated debug APKs for commit $GITHUB_SHA." \
-            --prerelease
-          gh release upload latest-build build/gh-app-publish/*.apk --clobber
+          if gh release view latest-build >/dev/null 2>&1; then
+            gh release edit latest-build \
+              --target "$GITHUB_SHA" \
+              --title "Latest Build" \
+              --notes "Automated debug APKs for commit $GITHUB_SHA." \
+              --prerelease
+          else
+            gh release create latest-build \
+              --target "$GITHUB_SHA" \
+              --title "Latest Build" \
+              --notes "Automated debug APKs for commit $GITHUB_SHA." \
+              --prerelease
+          fi
+          shopt -s nullglob
+          apks=(build/gh-app-publish/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No APK files found in build/gh-app-publish/"
+            exit 1
+          fi
+          gh release upload latest-build "${apks[@]}" --clobber
