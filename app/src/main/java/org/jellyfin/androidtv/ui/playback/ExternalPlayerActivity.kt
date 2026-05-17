@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.ui.playback
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
@@ -43,6 +44,13 @@ import kotlin.time.Duration.Companion.milliseconds
  * Once returned it will notify the server of item completion.
  */
 class ExternalPlayerActivity : FragmentActivity() {
+	private data class ExternalSubtitle(
+		val stream: MediaStream,
+		val format: String,
+		val url: String,
+		val uri: Uri,
+	)
+
 	companion object {
 		const val EXTRA_POSITION = "position"
 
@@ -72,6 +80,7 @@ class ExternalPlayerActivity : FragmentActivity() {
 		private const val API_VIMU_TITLE = "forcename"
 		private const val API_VIMU_SEEK_POSITION = "startfrom"
 		private const val API_VIMU_RESUME = "forceresume"
+		private const val API_VIMU_FORCED_SRT = "forcedsrt"
 		private const val API_VIMU_RESULT_ID = "net.gtvbox.videoplayer.result"
 		private const val API_VIMU_RESULT_ERROR = 4
 		private const val API_VIMU_RESULT_PLAYBACK_COMPLETED = 1
@@ -133,26 +142,45 @@ class ExternalPlayerActivity : FragmentActivity() {
 
 		val title = item.getDisplayName(this)
 		val fileName = mediaSource.path?.let { File(it).name }
+		val videoBaseName = mediaSource.path?.let { File(it).nameWithoutExtension }
 		val externalSubtitles = mediaSource.mediaStreams
 			?.filter { it.type == MediaStreamType.SUBTITLE && it.isExternal }
-			?.sortedWith(compareBy<MediaStream> { it.isDefault }.thenBy { it.index })
+			?.sortedWith(compareByDescending<MediaStream> { it.isDefault == true }.thenBy { it.index })
 			.orEmpty()
 
-		val subtitleUrls = externalSubtitles.map { mediaStream ->
+		val subtitleData = externalSubtitles.map { mediaStream ->
 			// We cannot use the DeliveryUrl as that is only populated when using the playback info API, which we skip as we'll always direct
 			// play when using external players. We need to infer the subtitle format based on its path (similar to how the server
 			// calculates it)
 			val format = mediaStream.path?.substringAfterLast('.', missingDelimiterValue = mediaStream.codec.orEmpty()) ?: "srt"
-			api.subtitleApi.getSubtitleUrl(
+			val subtitleUrl = api.subtitleApi.getSubtitleUrl(
 				routeItemId = item.id,
 				routeMediaSourceId = mediaSource.id.toString(),
 				routeIndex = mediaStream.index,
 				routeFormat = format,
 			)
-		}.toTypedArray()
-		var subtitleUrlsToUris = subtitleUrls.map { it.toUri() }.toTypedArray();
+			ExternalSubtitle(
+				stream = mediaStream,
+				format = format,
+				url = subtitleUrl,
+				uri = subtitleUrl.toUri(),
+			)
+		}
+		val subtitleUrls = subtitleData.map { it.url }.toTypedArray()
+		val subtitleUris = subtitleData.map { it.uri }.toTypedArray()
 		val subtitleNames = externalSubtitles.map { it.displayTitle ?: it.title.orEmpty() }.toTypedArray()
-		val subtitleLanguages = externalSubtitles.map { it.language.orEmpty() }.toTypedArray()
+		val subtitleFileNames = externalSubtitles.map { it.path?.let { path -> File(path).name }.orEmpty() }.toTypedArray()
+		var vimuFallbackSrtSubtitle: ExternalSubtitle? = null
+		var vimuPreferredSrtSubtitle: ExternalSubtitle? = null
+		for (subtitle in subtitleData) {
+			if (!subtitle.format.equals("srt", ignoreCase = true)) continue
+			if (vimuFallbackSrtSubtitle == null) vimuFallbackSrtSubtitle = subtitle
+			if (subtitleMatchesVideoName(subtitle.stream.path, videoBaseName)) {
+				vimuPreferredSrtSubtitle = subtitle
+				break
+			}
+		}
+		val vimuSubtitle = vimuPreferredSrtSubtitle ?: vimuFallbackSrtSubtitle
 
 		Timber.i(
 			"Starting item ${item.id} from $position with ${subtitleUrls.size} external subtitles: $url${
@@ -180,16 +208,19 @@ class ExternalPlayerActivity : FragmentActivity() {
 			putExtra(API_MX_TITLE, title)
 			putExtra(API_MX_FILENAME, fileName)
 			putExtra(API_MX_SECURE_URI, true)
-			putExtra(API_MX_SUBS, subtitleUrlsToUris)
+			putExtra(API_MX_SUBS, subtitleUris)
 			putExtra(API_MX_SUBS_NAME, subtitleNames)
-			putExtra(API_MX_SUBS_FILENAME, subtitleLanguages)
-			if (subtitleUrlsToUris.isNotEmpty()) putExtra(API_MX_SUBS_ENABLE, arrayOf(subtitleUrlsToUris.first()))
+			putExtra(API_MX_SUBS_FILENAME, subtitleFileNames)
+			if (subtitleUris.isNotEmpty()) putExtra(API_MX_SUBS_ENABLE, arrayOf(subtitleUris.first()))
 
 			if (subtitleUrls.isNotEmpty()) putExtra(API_VLC_SUBTITLES, subtitleUrls.first().toString())
 
 			putExtra(API_VIMU_SEEK_POSITION, position.inWholeMilliseconds.toInt())
 			putExtra(API_VIMU_RESUME, false)
 			putExtra(API_VIMU_TITLE, title)
+			vimuSubtitle?.let { subtitle ->
+				putExtra(API_VIMU_FORCED_SRT, subtitle.uri)
+			}
 		}
 
 		try {
@@ -199,6 +230,12 @@ class ExternalPlayerActivity : FragmentActivity() {
 			Toast.makeText(this, R.string.no_player_message, Toast.LENGTH_LONG).show()
 			finish()
 		}
+	}
+
+	private fun subtitleMatchesVideoName(subtitlePath: String?, videoBaseName: String?): Boolean {
+		if (subtitlePath == null || videoBaseName.isNullOrBlank()) return false
+		val subtitleBaseName = File(subtitlePath).nameWithoutExtension
+		return subtitleBaseName == videoBaseName || subtitleBaseName.startsWith("$videoBaseName.")
 	}
 
 
