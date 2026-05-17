@@ -8,6 +8,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: app-build-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -56,6 +60,7 @@ jobs:
               --notes "$release_notes" \
               --prerelease
           else
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/latest-build" >/dev/null 2>&1 || true
             gh release create latest-build \
               --target "$GITHUB_SHA" \
               --title "$release_title" \
