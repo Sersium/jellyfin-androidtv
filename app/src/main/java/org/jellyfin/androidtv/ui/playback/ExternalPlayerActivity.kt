@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.ui.playback
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
@@ -47,6 +48,7 @@ class ExternalPlayerActivity : FragmentActivity() {
 		val stream: MediaStream,
 		val format: String,
 		val url: String,
+		val uri: Uri,
 	)
 
 	companion object {
@@ -151,19 +153,21 @@ class ExternalPlayerActivity : FragmentActivity() {
 			// play when using external players. We need to infer the subtitle format based on its path (similar to how the server
 			// calculates it)
 			val format = mediaStream.path?.substringAfterLast('.', missingDelimiterValue = mediaStream.codec.orEmpty()) ?: "srt"
+			val subtitleUrl = api.subtitleApi.getSubtitleUrl(
+				routeItemId = item.id,
+				routeMediaSourceId = mediaSource.id.toString(),
+				routeIndex = mediaStream.index,
+				routeFormat = format,
+			)
 			ExternalSubtitle(
 				stream = mediaStream,
 				format = format,
-				url = api.subtitleApi.getSubtitleUrl(
-					routeItemId = item.id,
-					routeMediaSourceId = mediaSource.id.toString(),
-					routeIndex = mediaStream.index,
-					routeFormat = format,
-				),
+				url = subtitleUrl,
+				uri = subtitleUrl.toUri(),
 			)
 		}
 		val subtitleUrls = subtitleData.map { it.url }.toTypedArray()
-		val subtitleUris = subtitleUrls.map { it.toUri() }.toTypedArray()
+		val subtitleUris = subtitleData.map { it.uri }.toTypedArray()
 		val subtitleNames = externalSubtitles.map { it.displayTitle ?: it.title.orEmpty() }.toTypedArray()
 		val subtitleFileNames = externalSubtitles.map { it.path?.let { path -> File(path).name }.orEmpty() }.toTypedArray()
 		var vimuFallbackSrtSubtitle: ExternalSubtitle? = null
@@ -215,7 +219,7 @@ class ExternalPlayerActivity : FragmentActivity() {
 			putExtra(API_VIMU_RESUME, false)
 			putExtra(API_VIMU_TITLE, title)
 			vimuSubtitle?.let { subtitle ->
-				putExtra(API_VIMU_FORCED_SRT, subtitle.url.toUri())
+				putExtra(API_VIMU_FORCED_SRT, subtitle.uri)
 			}
 		}
 
