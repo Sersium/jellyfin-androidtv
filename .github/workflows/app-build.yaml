@@ -41,7 +41,7 @@ jobs:
           if-no-files-found: error
           path: build/gh-app-publish/
       - name: Publish latest APKs for guest download
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
