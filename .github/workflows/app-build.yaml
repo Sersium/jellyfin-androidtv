@@ -57,12 +57,12 @@ jobs:
             gh release delete latest-build --cleanup-tag --yes
           else
             # Clean up any existing latest-build tag before release creation.
-            echo "Ensuring orphaned latest-build tag is removed if present."
+            echo "Warning: latest-build release missing; cleaning up tag if present."
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/latest-build" >/dev/null 2>&1 || true
           fi
           gh release create latest-build \
             --target "$GITHUB_SHA" \
             --title "$release_title" \
             --notes "$release_notes" \
-            --prerelease
-          gh release upload latest-build "${apks[@]}" --clobber
+            --prerelease \
+            "${apks[@]}"
