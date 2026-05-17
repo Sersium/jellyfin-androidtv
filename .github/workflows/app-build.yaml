@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -36,3 +36,15 @@ jobs:
           retention-days: 14
           if-no-files-found: error
           path: build/gh-app-publish/
+      - name: Publish latest APKs for guest download
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest-build --cleanup-tag --yes || true
+          gh release create latest-build \
+            --target "$GITHUB_SHA" \
+            --title "Latest Build" \
+            --notes "Automated debug APKs for commit $GITHUB_SHA." \
+            --prerelease
+          gh release upload latest-build build/gh-app-publish/*.apk --clobber
