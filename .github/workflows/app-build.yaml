@@ -8,6 +8,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: app-build-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -36,3 +40,42 @@ jobs:
           retention-days: 14
           if-no-files-found: error
           path: build/gh-app-publish/
+  publish-latest:
+    name: Publish latest APKs for guest download
+    runs-on: ubuntu-24.04
+    needs: build
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: build-artifacts
+          path: build/gh-app-publish/
+      - name: Publish latest APKs for guest download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_title="Latest Build"
+          release_notes="Automated APKs for commit ${GITHUB_SHA:0:7}."
+          shopt -s nullglob
+          apks=(build/gh-app-publish/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No APK files found in build/gh-app-publish/"
+            exit 1
+          fi
+          if gh release view latest-build >/dev/null 2>&1; then
+            gh release edit latest-build \
+              --target "$GITHUB_SHA" \
+              --title "$release_title" \
+              --notes "$release_notes" \
+              --prerelease
+          else
+            gh release create latest-build \
+              --target "$GITHUB_SHA" \
+              --title "$release_title" \
+              --notes "$release_notes" \
+              --prerelease
+          fi
+          gh release upload latest-build "${apks[@]}" --clobber

@@ -1,10 +1,6 @@
 name: App / Lint
 
 on:
-  push:
-    branches:
-      - master
-      - release-*
   pull_request:
 
 permissions:

@@ -1,10 +1,6 @@
 name: App / Test
 
 on:
-  push:
-    branches:
-      - master
-      - release-*
   pull_request:
 
 permissions:
