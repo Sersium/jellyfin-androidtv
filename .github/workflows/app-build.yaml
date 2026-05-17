@@ -41,17 +41,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          release_title="Latest Build"
+          release_notes="Automated debug APKs for commit $GITHUB_SHA."
           if gh release view latest-build >/dev/null 2>&1; then
             gh release edit latest-build \
               --target "$GITHUB_SHA" \
-              --title "Latest Build" \
-              --notes "Automated debug APKs for commit $GITHUB_SHA." \
+              --title "$release_title" \
+              --notes "$release_notes" \
               --prerelease
           else
             gh release create latest-build \
               --target "$GITHUB_SHA" \
-              --title "Latest Build" \
-              --notes "Automated debug APKs for commit $GITHUB_SHA." \
+              --title "$release_title" \
+              --notes "$release_notes" \
               --prerelease
           fi
           shopt -s nullglob
