@@ -43,6 +43,12 @@ import kotlin.time.Duration.Companion.milliseconds
  * Once returned it will notify the server of item completion.
  */
 class ExternalPlayerActivity : FragmentActivity() {
+	private data class ExternalSubtitle(
+		val stream: MediaStream,
+		val format: String,
+		val url: String,
+	)
+
 	companion object {
 		const val EXTRA_POSITION = "position"
 
@@ -145,24 +151,27 @@ class ExternalPlayerActivity : FragmentActivity() {
 			// play when using external players. We need to infer the subtitle format based on its path (similar to how the server
 			// calculates it)
 			val format = mediaStream.path?.substringAfterLast('.', missingDelimiterValue = mediaStream.codec.orEmpty()) ?: "srt"
-			Triple(mediaStream, format, api.subtitleApi.getSubtitleUrl(
-				routeItemId = item.id,
-				routeMediaSourceId = mediaSource.id.toString(),
-				routeIndex = mediaStream.index,
-				routeFormat = format,
-			))
+			ExternalSubtitle(
+				stream = mediaStream,
+				format = format,
+				url = api.subtitleApi.getSubtitleUrl(
+					routeItemId = item.id,
+					routeMediaSourceId = mediaSource.id.toString(),
+					routeIndex = mediaStream.index,
+					routeFormat = format,
+				),
+			)
 		}
-		val subtitleUrls = subtitleData.map { it.third }.toTypedArray()
-		val subtitleUrlsToUris = subtitleUrls.map { it.toUri() }.toTypedArray()
+		val subtitleUrls = subtitleData.map { it.url }.toTypedArray()
+		val subtitleUris = subtitleUrls.map { it.toUri() }.toTypedArray()
 		val subtitleNames = externalSubtitles.map { it.displayTitle ?: it.title.orEmpty() }.toTypedArray()
 		val subtitleFileNames = externalSubtitles.map { it.path?.let { path -> File(path).name }.orEmpty() }.toTypedArray()
-		var vimuFallbackSrtSubtitle: Triple<MediaStream, String, String>? = null
-		var vimuPreferredSrtSubtitle: Triple<MediaStream, String, String>? = null
+		var vimuFallbackSrtSubtitle: ExternalSubtitle? = null
+		var vimuPreferredSrtSubtitle: ExternalSubtitle? = null
 		for (subtitle in subtitleData) {
-			val (stream, format, _) = subtitle
-			if (!format.equals("srt", ignoreCase = true)) continue
+			if (!subtitle.format.equals("srt", ignoreCase = true)) continue
 			if (vimuFallbackSrtSubtitle == null) vimuFallbackSrtSubtitle = subtitle
-			if (subtitleMatchesVideoName(stream.path, videoBaseName)) {
+			if (subtitleMatchesVideoName(subtitle.stream.path, videoBaseName)) {
 				vimuPreferredSrtSubtitle = subtitle
 				break
 			}
@@ -195,18 +204,18 @@ class ExternalPlayerActivity : FragmentActivity() {
 			putExtra(API_MX_TITLE, title)
 			putExtra(API_MX_FILENAME, fileName)
 			putExtra(API_MX_SECURE_URI, true)
-			putExtra(API_MX_SUBS, subtitleUrlsToUris)
+			putExtra(API_MX_SUBS, subtitleUris)
 			putExtra(API_MX_SUBS_NAME, subtitleNames)
 			putExtra(API_MX_SUBS_FILENAME, subtitleFileNames)
-			if (subtitleUrlsToUris.isNotEmpty()) putExtra(API_MX_SUBS_ENABLE, arrayOf(subtitleUrlsToUris.first()))
+			if (subtitleUris.isNotEmpty()) putExtra(API_MX_SUBS_ENABLE, arrayOf(subtitleUris.first()))
 
 			if (subtitleUrls.isNotEmpty()) putExtra(API_VLC_SUBTITLES, subtitleUrls.first().toString())
 
 			putExtra(API_VIMU_SEEK_POSITION, position.inWholeMilliseconds.toInt())
 			putExtra(API_VIMU_RESUME, false)
 			putExtra(API_VIMU_TITLE, title)
-			vimuSubtitle?.let { (_, _, subtitleUrl) ->
-				putExtra(API_VIMU_FORCED_SRT, subtitleUrl.toUri())
+			vimuSubtitle?.let { subtitle ->
+				putExtra(API_VIMU_FORCED_SRT, subtitle.url.toUri())
 			}
 		}
 
