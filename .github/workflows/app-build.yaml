@@ -29,8 +29,8 @@ jobs:
           java-version-file: .tools-versions
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
-      - name: Assemble debug APKs
-        run: ./gradlew assembleDebug
+      - name: Assemble release APKs
+        run: ./gradlew assembleRelease
       - name: Create publish bundle
         run: mkdir -p build/gh-app-publish/; find app/build/ -iname "*.apk" -exec mv "{}" build/gh-app-publish/ \;
       - name: Upload artifacts
@@ -58,7 +58,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           release_title="Latest Build"
-          release_notes="Automated APKs for commit ${GITHUB_SHA:0:7}."
+          release_notes="Automated optimized APKs for commit ${GITHUB_SHA:0:7}."
           shopt -s nullglob
           apks=(build/gh-app-publish/*.apk)
           if [ ${#apks[@]} -eq 0 ]; then
