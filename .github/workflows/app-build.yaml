@@ -29,8 +29,55 @@ jobs:
           java-version-file: .tools-versions
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - name: Configure release signing (optional)
+        env:
+          CI_RELEASE_KEYSTORE_BASE64: ${{ secrets.CI_RELEASE_KEYSTORE_BASE64 }}
+          CI_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.CI_RELEASE_KEYSTORE_PASSWORD }}
+          CI_RELEASE_KEY_ALIAS: ${{ secrets.CI_RELEASE_KEY_ALIAS }}
+          CI_RELEASE_KEY_PASSWORD: ${{ secrets.CI_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$CI_RELEASE_KEYSTORE_BASE64" ] && [ -n "$CI_RELEASE_KEYSTORE_PASSWORD" ] && [ -n "$CI_RELEASE_KEY_ALIAS" ] && [ -n "$CI_RELEASE_KEY_PASSWORD" ]; then
+            keystore_path="$RUNNER_TEMP/ci-release-signing.jks"
+            printf '%s' "$CI_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+            chmod 600 "$keystore_path"
+            {
+              echo "KEYSTORE_FILE=$keystore_path"
+              echo "KEYSTORE_PASSWORD=$CI_RELEASE_KEYSTORE_PASSWORD"
+              echo "SIGNING_KEY_ALIAS=$CI_RELEASE_KEY_ALIAS"
+              echo "SIGNING_KEY_PASSWORD=$CI_RELEASE_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "Configured release signing from CI secrets."
+          else
+            echo "CI release signing secrets are incomplete; assembleRelease will fall back to the debug keystore."
+          fi
       - name: Assemble release APKs
         run: ./gradlew assembleRelease
+      - name: Clean up CI signing keystore
+        if: ${{ always() }}
+        run: |
+          if [ -n "$KEYSTORE_FILE" ] && [ -f "$KEYSTORE_FILE" ]; then
+            if command -v shred >/dev/null 2>&1; then
+              shred -u "$KEYSTORE_FILE"
+            else
+              rm -f "$KEYSTORE_FILE"
+            fi
+          fi
+      - name: Verify release APK signatures
+        run: |
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/release/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No release APK files found"
+            exit 1
+          fi
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          if [ -z "$apksigner" ]; then
+            echo "apksigner not found in $ANDROID_HOME/build-tools"
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            "$apksigner" verify --verbose "$apk"
+          done
       - name: Create publish bundle
         run: mkdir -p build/gh-app-publish/; find app/build/ -iname "*.apk" -exec mv "{}" build/gh-app-publish/ \;
       - name: Upload artifacts
