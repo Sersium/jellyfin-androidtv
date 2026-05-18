@@ -39,6 +39,7 @@ jobs:
           if [ -n "$CI_RELEASE_KEYSTORE_BASE64" ] && [ -n "$CI_RELEASE_KEYSTORE_PASSWORD" ] && [ -n "$CI_RELEASE_KEY_ALIAS" ] && [ -n "$CI_RELEASE_KEY_PASSWORD" ]; then
             keystore_path="$RUNNER_TEMP/ci-release-signing.jks"
             printf '%s' "$CI_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+            chmod 600 "$keystore_path"
             {
               echo "KEYSTORE_FILE=$keystore_path"
               echo "KEYSTORE_PASSWORD=$CI_RELEASE_KEYSTORE_PASSWORD"
@@ -55,7 +56,11 @@ jobs:
         if: ${{ always() }}
         run: |
           if [ -n "$KEYSTORE_FILE" ] && [ -f "$KEYSTORE_FILE" ]; then
-            rm -f "$KEYSTORE_FILE"
+            if command -v shred >/dev/null 2>&1; then
+              shred -u "$KEYSTORE_FILE"
+            else
+              rm -f "$KEYSTORE_FILE"
+            fi
           fi
       - name: Verify release APK signatures
         run: |

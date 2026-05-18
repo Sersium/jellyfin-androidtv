@@ -76,7 +76,8 @@ keytool -genkeypair -v \
   -keystore ci-release-signing.jks \
   -alias ci-release \
   -keyalg RSA -keysize 2048 -validity 10000
-base64 < ci-release-signing.jks | tr -d "\n"
+base64 < ci-release-signing.jks | tr -d "\n" > ci-release-signing.jks.base64
+cat ci-release-signing.jks.base64
 ```
 
 Store the base64 output and passwords in `CI_RELEASE_KEYSTORE_BASE64`, `CI_RELEASE_KEYSTORE_PASSWORD`, `CI_RELEASE_KEY_ALIAS`, and
