@@ -51,6 +51,12 @@ jobs:
           fi
       - name: Assemble release APKs
         run: ./gradlew assembleRelease
+      - name: Clean up CI signing keystore
+        if: ${{ always() }}
+        run: |
+          if [ -n "$KEYSTORE_FILE" ] && [ -f "$KEYSTORE_FILE" ]; then
+            rm -f "$KEYSTORE_FILE"
+          fi
       - name: Verify release APK signatures
         run: |
           shopt -s nullglob
