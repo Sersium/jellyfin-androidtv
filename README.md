@@ -68,6 +68,20 @@ your local debug keystore, a different local release keystore, or any other non-
 other installation signed with a different key; uninstall the existing app first, or configure and consistently use your own release keystore
 with the `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS`, and `SIGNING_KEY_PASSWORD` environment variables.
 
+For CI builds that should support in-place updates between artifacts, configure a dedicated non-production keystore in repository secrets so
+the same key is used on every run. You can create one without Android Studio using the JDK `keytool` command:
+
+```shell
+keytool -genkeypair -v \
+  -keystore ci-release-signing.jks \
+  -alias ci-release \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w 0 ci-release-signing.jks
+```
+
+Store the base64 output and passwords in `CI_RELEASE_KEYSTORE_BASE64`, `CI_RELEASE_KEYSTORE_PASSWORD`, `CI_RELEASE_KEY_ALIAS`, and
+`CI_RELEASE_KEY_PASSWORD` repository secrets. The `App / Build` workflow uses these values automatically when present.
+
 ## Branching
 
 The `master` branch is the primary development branch and the target for all pull requests. It is **unstable** and may contain breaking
