@@ -55,6 +55,17 @@ PATH, then use the Gradle wrapper (`./gradlew`) to build the project with the `a
 The task will create an APK file in the `/app/build/outputs/apk/debug` directory. This APK file uses a different app-id from our stable
 builds and can be manually installed to your device.
 
+To build an optimized release APK for sideloading, run:
+
+```shell
+./gradlew assembleRelease
+```
+
+The task will create a signed APK file in the `/app/build/outputs/apk/release` directory. If no release keystore is configured, Gradle signs
+the release APK with your local debug keystore so Android TV devices can install it. Builds signed this way are still release builds, but
+they cannot update an APK signed with the official Jellyfin release key; uninstall the official app first or configure your own release
+keystore with the `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS`, and `SIGNING_KEY_PASSWORD` environment variables.
+
 ## Branching
 
 The `master` branch is the primary development branch and the target for all pull requests. It is **unstable** and may contain breaking

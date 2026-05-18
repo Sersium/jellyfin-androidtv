@@ -43,6 +43,8 @@ android {
 				keyAlias = signingKeyAlias
 				keyPassword = signingKeyPassword
 			}
+		} else {
+			logger.warn("Release signing configuration is incomplete; release APKs will use the debug keystore for sideloadable builds.")
 		}
 	}
 
@@ -67,7 +69,10 @@ android {
 
 			buildConfigField("boolean", "DEVELOPMENT", "false")
 
-			signingConfig = signingConfigs.findByName("release")
+			// Always sign release APKs so CI artifacts are installable on Android TV devices.
+			// Official release builds provide the "release" signing config via secrets;
+			// local and pull-request builds fall back to the standard debug keystore.
+			signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
 		}
 
 		debug {
