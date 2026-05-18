@@ -81,7 +81,7 @@ cat ci-release-signing.jks.base64
 ```
 
 Store the base64 output and passwords in `CI_RELEASE_KEYSTORE_BASE64`, `CI_RELEASE_KEYSTORE_PASSWORD`, `CI_RELEASE_KEY_ALIAS`, and
-`CI_RELEASE_KEY_PASSWORD` repository secrets. The `App / Build` workflow uses these values automatically when present.
+`CI_RELEASE_KEY_PASSWORD` repository secrets. The `.github/workflows/app-build.yaml` workflow uses these values automatically when present.
 
 ## Branching
 
