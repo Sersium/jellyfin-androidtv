@@ -151,8 +151,9 @@ class ExternalPlayerActivity : FragmentActivity() {
 		val subtitleData = externalSubtitles.map { mediaStream ->
 			// We cannot use the DeliveryUrl as that is only populated when using the playback info API, which we skip as we'll always direct
 			// play when using external players. We need to infer the subtitle format based on its path (similar to how the server
-			// calculates it)
-			val format = mediaStream.path?.substringAfterLast('.', missingDelimiterValue = mediaStream.codec.orEmpty()) ?: "srt"
+			// calculates it). Jellyfin may report SRT subtitles as either "srt" or the codec name "subrip"; request the .srt
+			// endpoint for both so external players that only accept SRT URLs (like Vimu's forcedsrt API) can consume them.
+			val format = inferSubtitleFormat(mediaStream)
 			val subtitleUrl = api.subtitleApi.getSubtitleUrl(
 				routeItemId = item.id,
 				routeMediaSourceId = mediaSource.id.toString(),
@@ -173,7 +174,7 @@ class ExternalPlayerActivity : FragmentActivity() {
 		var vimuFallbackSrtSubtitle: ExternalSubtitle? = null
 		var vimuPreferredSrtSubtitle: ExternalSubtitle? = null
 		for (subtitle in subtitleData) {
-			if (!subtitle.format.equals("srt", ignoreCase = true)) continue
+			if (!subtitle.isSrt) continue
 			if (vimuFallbackSrtSubtitle == null) vimuFallbackSrtSubtitle = subtitle
 			if (subtitleMatchesVideoName(subtitle.stream.path, videoBaseName)) {
 				vimuPreferredSrtSubtitle = subtitle
@@ -219,7 +220,8 @@ class ExternalPlayerActivity : FragmentActivity() {
 			putExtra(API_VIMU_RESUME, false)
 			putExtra(API_VIMU_TITLE, title)
 			vimuSubtitle?.let { subtitle ->
-				putExtra(API_VIMU_FORCED_SRT, subtitle.uri)
+				// Vimu documents forcedsrt as a String extra containing the subtitle URL, not a Uri parcelable.
+				putExtra(API_VIMU_FORCED_SRT, subtitle.url)
 			}
 		}
 
@@ -229,6 +231,18 @@ class ExternalPlayerActivity : FragmentActivity() {
 		} catch (_: ActivityNotFoundException) {
 			Toast.makeText(this, R.string.no_player_message, Toast.LENGTH_LONG).show()
 			finish()
+		}
+	}
+
+	private val ExternalSubtitle.isSrt: Boolean
+		get() = format.equals("srt", ignoreCase = true)
+
+	private fun inferSubtitleFormat(mediaStream: MediaStream): String {
+		val sourceFormat = mediaStream.path?.substringAfterLast('.', missingDelimiterValue = mediaStream.codec.orEmpty()) ?: "srt"
+
+		return when {
+			sourceFormat.equals("subrip", ignoreCase = true) -> "srt"
+			else -> sourceFormat
 		}
 	}
 
