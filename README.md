@@ -63,8 +63,10 @@ To build an optimized release APK for sideloading, run:
 
 The task will create a signed APK file in the `/app/build/outputs/apk/release` directory. If no release keystore is configured, Gradle signs
 the release APK with your local debug keystore so Android TV devices can install it. Builds signed this way are still release builds, but
-they cannot update an APK signed with the official Jellyfin release key; uninstall the official app first or configure your own release
-keystore with the `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS`, and `SIGNING_KEY_PASSWORD` environment variables.
+Android only allows an installed APK to be updated by another APK signed with the same keystore/signing key. That means a build signed with
+your local debug keystore, a different local release keystore, or any other non-matching key cannot update the official Jellyfin app or any
+other installation signed with a different key; uninstall the existing app first, or configure and consistently use your own release keystore
+with the `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS`, and `SIGNING_KEY_PASSWORD` environment variables.
 
 ## Branching
 
